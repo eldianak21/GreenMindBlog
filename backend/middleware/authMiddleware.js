@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
-const pool = require('../config/db');
+const User = require('../models/User');
 require('dotenv').config();
 
+// Protect routes
 const protect = async (req, res, next) => {
   let token;
 
@@ -17,16 +18,11 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get user from the token
-      const [user] = await pool.query('SELECT id, name, email FROM users WHERE id = ?', [decoded.id]);
+      req.user = await User.findById(decoded.id);
 
-      if (user.length === 0) {
-        return res.status(401).json({ message: 'Not authorized' });
-      }
-
-      req.user = user[0];
       next();
     } catch (error) {
-      console.error(error);
+      console.error('Authentication error:', error);
       res.status(401).json({ message: 'Not authorized' });
     }
   }
@@ -36,4 +32,13 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+// Admin middleware
+const admin = (req, res, next) => {
+  if (req.user && req.user.isAdmin) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as admin' });
+  }
+};
+
+module.exports = { protect, admin };
